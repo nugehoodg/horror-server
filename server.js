@@ -6,10 +6,35 @@ const app = express();
 const server = http.createServer(app);
 const wss = new WebSocket.Server({ server });
 
-const sessions = {}; // { sessionId: { game: ws, phone: ws } }
+const sessions = {}; 
+// {
+//   ABC123: {
+//     game: ws,
+//     phone: ws,
+//     timeout: null
+//   }
+// }
 
 function generateSessionId() {
     return Math.random().toString(36).substring(2, 8).toUpperCase();
+}
+
+function clearSessionTimeout(session) {
+    if (session.timeout) {
+        clearTimeout(session.timeout);
+        session.timeout = null;
+    }
+}
+
+function scheduleSessionDeletion(id) {
+    if (!sessions[id]) return;
+
+    console.log("Scheduling deletion:", id);
+
+    sessions[id].timeout = setTimeout(() => {
+        delete sessions[id];
+        console.log("Session expired:", id);
+    }, 30000); // 30 sec grace period
 }
 
 wss.on("connection", (ws) => {
@@ -19,10 +44,15 @@ wss.on("connection", (ws) => {
         msg = msg.toString();
         console.log("RECEIVED:", msg);
 
-        // GAME creates session
+        // 🎮 GAME creates session
         if (msg === "CREATE_SESSION") {
             const id = generateSessionId();
-            sessions[id] = { game: ws, phone: null };
+
+            sessions[id] = {
+                game: ws,
+                phone: null,
+                timeout: null
+            };
 
             ws.sessionId = id;
 
@@ -31,7 +61,7 @@ wss.on("connection", (ws) => {
             return;
         }
 
-        // PHONE joins session
+        // 📱 PHONE joins session
         if (msg.startsWith("JOIN:")) {
             const id = msg.split(":")[1];
 
@@ -39,31 +69,71 @@ wss.on("connection", (ws) => {
                 sessions[id].phone = ws;
                 ws.sessionId = id;
 
+                clearSessionTimeout(sessions[id]);
+
                 console.log("Phone joined:", id);
+
+                // 🔥 notify game
+                if (sessions[id].game) {
+                    sessions[id].game.send("PHONE_CONNECTED");
+                }
             } else {
                 ws.send("ERROR:INVALID_SESSION");
             }
             return;
         }
 
-        // NORMAL MESSAGE
-        const id = ws.sessionId;
+        // 🔴 MANUAL END SESSION
+        if (msg === "END_SESSION") {
+            const id = ws.sessionId;
 
+            if (id && sessions[id]) {
+                delete sessions[id];
+                console.log("Session manually ended:", id);
+            }
+            return;
+        }
+
+        // 🔁 NORMAL MESSAGE FORWARDING
+        const id = ws.sessionId;
         if (!id || !sessions[id]) return;
 
         const session = sessions[id];
 
-        // forward game → phone
+        // game → phone
         if (ws === session.game && session.phone) {
             session.phone.send(msg);
+        }
+
+        // phone → game (optional)
+        if (ws === session.phone && session.game) {
+            session.game.send(msg);
         }
     });
 
     ws.on("close", () => {
         const id = ws.sessionId;
-        if (id && sessions[id]) {
+        if (!id || !sessions[id]) return;
+
+        const session = sessions[id];
+
+        console.log("Disconnected:", id);
+
+        // 📱 phone disconnected
+        if (ws === session.phone) {
+            session.phone = null;
+
+            if (session.game) {
+                session.game.send("PHONE_DISCONNECTED");
+            }
+
+            scheduleSessionDeletion(id);
+        }
+
+        // 🎮 game disconnected → delete immediately
+        if (ws === session.game) {
             delete sessions[id];
-            console.log("Session closed:", id);
+            console.log("Game closed session:", id);
         }
     });
 });
