@@ -38,7 +38,7 @@
     </div>
 
     <script>
-      const ws = new WebSocket("ws://10.243.117.90:8080"); // change IP
+      const ws = new WebSocket("wss://horror-server-production.up.railway.app"); // change IP
 
       ws.onopen = () => {
         ws.send("PHONE");
