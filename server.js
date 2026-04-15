@@ -62,26 +62,25 @@ wss.on("connection", (ws) => {
         }
 
         //  PHONE joins session
-        if (msg.startsWith("JOIN:")) {
-            const id = msg.split(":")[1];
+// PHONE joins session
+if (msg.startsWith("JOIN:")) {
+    const id = msg.split(":")[1];
+    if (sessions[id].phone) {
+    ws.send("ERROR:SESSION_FULL");
+    return;
+}
 
-            if (sessions[id]) {
-                sessions[id].phone = ws;
-                ws.sessionId = id;
+    if (sessions[id]) {
+        sessions[id].phone = ws;
+        ws.sessionId = id;
 
-                clearSessionTimeout(sessions[id]);
-
-                console.log("Phone joined:", id);
-
-                // 🔥 notify game
-                if (sessions[id].game) {
-                    sessions[id].game.send("PHONE_CONNECTED");
-                }
-            } else {
-                ws.send("ERROR:INVALID_SESSION");
-            }
-            return;
-        }
+        ws.send("JOINED:" + id); // ✅ confirm success
+        console.log("Phone joined:", id);
+    } else {
+        ws.send("ERROR:INVALID_SESSION"); // ❌ reject
+    }
+    return;
+}
 
         //  MANUAL END SESSION
         if (msg === "END_SESSION") {
