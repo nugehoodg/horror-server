@@ -44,7 +44,7 @@ wss.on("connection", (ws) => {
         msg = msg.toString();
         console.log("RECEIVED:", msg);
 
-        // 🎮 GAME creates session
+        //  GAME creates session
         if (msg === "CREATE_SESSION") {
             const id = generateSessionId();
 
@@ -61,7 +61,7 @@ wss.on("connection", (ws) => {
             return;
         }
 
-        // 📱 PHONE joins session
+        //  PHONE joins session
         if (msg.startsWith("JOIN:")) {
             const id = msg.split(":")[1];
 
@@ -83,7 +83,7 @@ wss.on("connection", (ws) => {
             return;
         }
 
-        // 🔴 MANUAL END SESSION
+        //  MANUAL END SESSION
         if (msg === "END_SESSION") {
             const id = ws.sessionId;
 
@@ -94,7 +94,7 @@ wss.on("connection", (ws) => {
             return;
         }
 
-        // 🔁 NORMAL MESSAGE FORWARDING
+        //  NORMAL MESSAGE FORWARDING
         const id = ws.sessionId;
         if (!id || !sessions[id]) return;
 
@@ -130,7 +130,7 @@ wss.on("connection", (ws) => {
             scheduleSessionDeletion(id);
         }
 
-        // 🎮 game disconnected → delete immediately
+        //  game disconnected → delete immediately
         if (ws === session.game) {
             delete sessions[id];
             console.log("Game closed session:", id);
