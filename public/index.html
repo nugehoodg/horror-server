@@ -1,0 +1,80 @@
+<!doctype html>
+<html>
+  <head>
+    <style>
+      #popup {
+        position: absolute;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        font-size: 28px;
+      }
+
+      .hidden {
+        display: none;
+      }
+    </style>
+  </head>
+  <div id="popup" class="hidden">
+    <div id="popupText"></div>
+  </div>
+
+  <body style="background: black; color: white; text-align: center">
+    <div
+      style="
+        display: grid;
+        justify-content: center;
+        align-items: center;
+        padding-top: 20px;
+      "
+    >
+      <h1>Symonca OS</h1>
+      <sub>This version of the Symonca OS is dedicated for testing only!</sub>
+      <h2 id="username">Enter your name on the desktop app</h2>
+    </div>
+
+    <script>
+      const ws = new WebSocket("ws://10.243.117.90:8080"); // change IP
+
+      ws.onopen = () => {
+        ws.send("PHONE");
+      };
+
+      ws.onmessage = async (event) => {
+        let msg = event.data;
+
+        // convert if binary
+        if (msg instanceof Blob) {
+          msg = await msg.text();
+        }
+
+        console.log("RECEIVED:", msg);
+
+        if (msg.startsWith("text:")) {
+          const popup = document.getElementById("popup");
+          const popupText = document.getElementById("popupText");
+
+          popup.classList.remove("hidden");
+          popupText.innerText = msg.replace("text:", "");
+        }
+
+        if (msg.startsWith("changetext:")) {
+          const element = document.getElementById("username");
+          element.textContent = "Welcome " + msg.replace("changetext:", "");
+        }
+
+        if (msg === "vibrate") {
+          navigator.vibrate(500);
+        }
+
+        if (msg.startsWith("color:")) {
+          document.body.style.background = msg.replace("color:", "");
+        }
+      };
+    </script>
+  </body>
+</html>
