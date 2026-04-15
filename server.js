@@ -62,23 +62,33 @@ wss.on("connection", (ws) => {
         }
 
         //  PHONE joins session
-// PHONE joins session
+
 if (msg.startsWith("JOIN:")) {
     const id = msg.split(":")[1];
-    if (sessions[id].phone) {
-    ws.send("ERROR:SESSION_FULL");
-    return;
-}
 
-    if (sessions[id]) {
-        sessions[id].phone = ws;
-        ws.sessionId = id;
-
-        ws.send("JOINED:" + id); // ✅ confirm success
-        console.log("Phone joined:", id);
-    } else {
-        ws.send("ERROR:INVALID_SESSION"); // ❌ reject
+    if (!sessions[id]) {
+        ws.send("ERROR:INVALID_SESSION");
+        return;
     }
+
+    const session = sessions[id];
+
+    // prevent crash if session is corrupted
+    if (!session || typeof session !== "object") {
+        ws.send("ERROR:INVALID_SESSION");
+        return;
+    }
+
+    session.phone = ws;
+    ws.sessionId = id;
+
+    try {
+        ws.send("JOINED:" + id);
+    } catch (err) {
+        console.log("Send failed:", err);
+    }
+
+    console.log("Phone joined:", id);
     return;
 }
 
@@ -100,41 +110,44 @@ if (msg.startsWith("JOIN:")) {
         const session = sessions[id];
 
         // game → phone
-        if (ws === session.game && session.phone) {
-            session.phone.send(msg);
-        }
+if (ws === session.game && session.phone) {
+    try {
+        session.phone.send(msg);
+    } catch (err) {
+        console.log("Forward error:", err);
+    }
+}
 
         // phone → game (optional)
-        if (ws === session.phone && session.game) {
-            session.game.send(msg);
-        }
+if (ws === session.phone && session.game) {
+    try {
+        session.game.send(msg);
+    } catch (err) {
+        console.log("Forward error:", err);
+    }
+}
     });
 
-    ws.on("close", () => {
-        const id = ws.sessionId;
-        if (!id || !sessions[id]) return;
+ws.on("close", () => {
+    const id = ws.sessionId;
+    if (!id || !sessions[id]) return;
 
-        const session = sessions[id];
+    const session = sessions[id];
 
-        console.log("Disconnected:", id);
+    if (ws === session.game) {
+        session.game = null;
+    }
 
-        // 📱 phone disconnected
-        if (ws === session.phone) {
-            session.phone = null;
+    if (ws === session.phone) {
+        session.phone = null;
+    }
 
-            if (session.game) {
-                session.game.send("PHONE_DISCONNECTED");
-            }
-
-            scheduleSessionDeletion(id);
-        }
-
-        //  game disconnected → delete immediately
-        if (ws === session.game) {
-            delete sessions[id];
-            console.log("Game closed session:", id);
-        }
-    });
+    // only delete if both gone
+    if (!session.game && !session.phone) {
+        delete sessions[id];
+        console.log("Session closed:", id);
+    }
+});
 });
 
 app.get("/", (req, res) => {
