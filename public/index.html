@@ -3,7 +3,7 @@
   <head>
     <style>
       #popup {
-        position: absolute;
+        position: fixed;
         top: 0;
         left: 0;
         width: 100%;
@@ -12,6 +12,8 @@
         justify-content: center;
         align-items: center;
         font-size: 28px;
+        background: black;
+        color: red;
       }
 
       .hidden {
@@ -19,9 +21,6 @@
       }
     </style>
   </head>
-  <div id="popup" class="hidden">
-    <div id="popupText"></div>
-  </div>
 
   <body style="background: black; color: white; text-align: center">
     <div
@@ -34,26 +33,42 @@
     >
       <h1>Symonca OS</h1>
       <sub>This version of the Symonca OS is dedicated for testing only!</sub>
-      <h2 id="username">Enter your name on the desktop app</h2>
+      <h2 id="username">Connecting...</h2>
+    </div>
+
+    <div id="popup" class="hidden">
+      <div id="popupText"></div>
     </div>
 
     <script>
-      const ws = new WebSocket("wss://horror-server-production.up.railway.app"); // change IP
+      // 🔥 GET SESSION FROM URL
+      const params = new URLSearchParams(window.location.search);
+      const session = params.get("session");
+
+      const ws = new WebSocket("wss://horror-server-production.up.railway.app");
 
       ws.onopen = () => {
-        ws.send("PHONE");
+        console.log("Connected");
+
+        if (session) {
+          ws.send("JOIN:" + session);
+          console.log("Joined session:", session);
+        } else {
+          document.getElementById("username").textContent = "No session ID!";
+        }
       };
 
       ws.onmessage = async (event) => {
         let msg = event.data;
 
-        // convert if binary
+        // Fix binary messages
         if (msg instanceof Blob) {
           msg = await msg.text();
         }
 
         console.log("RECEIVED:", msg);
 
+        // 🔥 POPUP MESSAGE
         if (msg.startsWith("text:")) {
           const popup = document.getElementById("popup");
           const popupText = document.getElementById("popupText");
@@ -62,15 +77,18 @@
           popupText.innerText = msg.replace("text:", "");
         }
 
+        // 🔥 NAME CHANGE
         if (msg.startsWith("changetext:")) {
           const element = document.getElementById("username");
           element.textContent = "Welcome " + msg.replace("changetext:", "");
         }
 
+        // 🔥 VIBRATE
         if (msg === "vibrate") {
           navigator.vibrate(500);
         }
 
+        // 🔥 COLOR CHANGE
         if (msg.startsWith("color:")) {
           document.body.style.background = msg.replace("color:", "");
         }
